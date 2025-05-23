@@ -86,7 +86,7 @@ def main():
         st.markdown("### 💬 Ask Your Database")
         query = st.text_area("Query Input", label_visibility="collapsed", height=68)
 
-        if st.button("🚀 Submit") and query.strip():
+        if st.button("Submit") and query.strip():
             try:
                 schema_text = get_schema_faiss(query, db)
                 example_set = get_examples_faiss(query)
