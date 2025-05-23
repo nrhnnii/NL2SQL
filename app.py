@@ -61,7 +61,7 @@ def get_schema_faiss(query, db, k=4):
     return "\n\n".join([table_blocks[i] for i in indices[0]])
 
 def extract_sql(text):
-    match = re.search(r"```sql\s*(.*?)\s*```", text, re.DOTALL)
+    match = re.search(r"```sql\s*(.*?)```", text, re.DOTALL)
     if match:
         return match.group(1).strip()
     lines = text.strip().splitlines()
@@ -86,68 +86,54 @@ def main():
         st.markdown("### 💬 Ask Your Database")
         query = st.text_area("Query Input", label_visibility="collapsed", height=68)
 
-        if st.button("Submit") and query.strip():
+        if st.button("🚀 Submit") and query.strip():
             try:
-                schema = get_schema_faiss(query, db)
-                examples = get_examples_faiss(query)
-                formatted_examples = "\n".join([f"User input: {ex['input']}\nSQL query: {ex['query']}" for ex in examples])
+                schema_text = get_schema_faiss(query, db)
+                example_set = get_examples_faiss(query)
 
-                prompt_text = f"""You are a SQL expert. Create a correct query using the top {{top_k}} most relevant tables.
-
-Relevant schema:
-{{table_info}}
-
-Examples:
-{formatted_examples}
-
-User input: {{input}}
-SQL query:"""
+                formatted_examples = "\n".join([f"User input: {ex['input']}\nSQL query: {ex['query']}" for ex in example_set])
 
                 dyn_prompt = PromptTemplate(
                     input_variables=["input", "top_k", "table_info"],
-                    template=prompt_text
+                    template=f"""You are a SQL expert. Create a correct query using the top {{top_k}} most relevant tables.\n\nRelevant schema:\n{{table_info}}\n\nExamples:\n{formatted_examples}\n\nUser input: {{input}}\nSQL query:"""
                 )
 
                 chain = create_sql_query_chain(llm=llm, db=db, prompt=dyn_prompt)
                 response = chain.invoke({
                     "question": query,
                     "input": query,
-                    "table_info": schema,
+                    "table_info": schema_text,
                     "top_k": 5
                 })
 
                 raw_sql = extract_sql(response)
-                raw_conn = db._engine.raw_connection()
-                cursor = raw_conn.cursor()
-                try:
-                    cursor.execute(raw_sql)
-                    all_rows = cursor.fetchall()
-                    column_names = [desc[0] for desc in cursor.description]
-                    cursor.close()
-                    raw_conn.close()
+                st.markdown("### 🧠 Generated SQL Query")
+                st.code(raw_sql if raw_sql else "[No SQL query detected]", language="sql")
 
-                    st.success("✅ SQL query executed successfully.")
-                    st.markdown("### 📄 SQL Query Generated")
-                    st.code(raw_sql, language="sql")
+                with db._engine.connect() as connection:
+                    result_df = pd.read_sql(raw_sql, connection)
 
-                    df = pd.DataFrame(all_rows, columns=column_names)
+                if not result_df.empty:
                     st.markdown("### 📊 Query Result Preview")
-                    st.dataframe(df)
+                    st.dataframe(result_df)
 
-                    n_rows, n_cols = df.shape
+                    n_rows, n_cols = result_df.shape
                     row_label = "row" if n_rows == 1 else "rows"
                     col_label = "column" if n_cols == 1 else "columns"
                     st.markdown(f"**{n_rows} {row_label} × {n_cols} {col_label}**")
 
-                    csv = df.to_csv(index=False).encode("utf-8")
-                    st.download_button("📥 Download Full Results as CSV", csv, "query_results.csv", "text/csv")
-                except Exception as e:
-                    st.error(f"❌ SQL execution failed: {e}")
-                    cursor.close()
-                    raw_conn.close()
+                    csv = result_df.to_csv(index=False).encode("utf-8")
+                    st.download_button(
+                        label="📥 Download Full Results as CSV",
+                        data=csv,
+                        file_name="query_results.csv",
+                        mime="text/csv"
+                    )
+                else:
+                    st.info("✅ Query executed, but no rows were returned.")
 
             except Exception as e:
-                st.error(f"⚠️ Something went wrong: {e}")
+                st.error(f"❌ Error: {e}")
 
 if __name__ == "__main__":
     main()
