@@ -27,4 +27,3 @@ This app lets you upload a SQLite database and ask questions in plain English. I
 | LangChain         | Prompting & DB access             |
 | SQLite            | Database format supported         |
 | Python + Pandas   | Query execution & table display   |
-
