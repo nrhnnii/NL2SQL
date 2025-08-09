@@ -1,5 +1,7 @@
 # 🧠 NL2SQL Streamlit App
 
+![NL2SQL — Streamlit UI screenshot](./NL2SQL.png "NL2SQL Streamlit App")
+
 Turn natural language into SQL — interactively and intelligently.
 
 This app lets you upload a SQLite database and ask questions in plain English. It retrieves the most relevant schema, picks example prompts, and uses OpenAI's GPT-4o-mini to generate accurate SQL queries — all inside a beautiful Streamlit interface.
